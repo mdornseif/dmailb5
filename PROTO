@@ -1,0 +1,89 @@
+#The server sends "you talk of peace and prepare for war\nv1 gzip
+rijndael\n", "v1 gzip rijndael blocksize 1024" indicates protocol
+version and may be changed in further relases. Then the server sends
+16 bytes of data as token/connection ID.
+
+The client sends a netstring containing his username. The username is
+case sensive. then he sends back the 16 byte token encrypted with the
+connection key and and 32 bit unsigned integer in network byte order
+specifing the line speed in bytes per second between the client and
+the server. If the client has no idea of the line speed he may
+announce 0. The line speed is used by the server to decide which
+compression ratio to use.
+
+Then the server starts sending any number of Datablocks While reciving
+DATABLOCKS the client may send DELETIONREQUSTS any time.
+
+Example:
+
+<<< "you talk of peace and prepare for war\n" 
+<<< "v1 gzip rijndael blocksize 1024\n"
+<<< ABCDEFGHIJKLMNOP 
+>>> 6:doobee, 
+>>> xENCRYPTEDTOKENx
+>>> LINESPED
+<<< DATABLOCK
+<<< DATABLOCK
+>>> DELETIONREQUEST
+<<< DATABLOCK
+<<< DATABLOCK
+<<< DATABLOCK
+<<< DATABLOCK
+>>> DELETIONREQUEST
+<<< DATABLOCK
+>>> DELETIONREQUEST
+>>> DELETIONREQUEST
+
+DATABLOCKS are netstrings consisting of a byte indicating the
+datatype, and the data itself.
+
+DATATYPES
+E errormessage
+P encrypted compressed payload (CPAYLOAD)
+L last message send by the server
+
+Example: 
+42:Etemporary error: can't read your Maildir/,
+64:P1234567890qwertzuiopasdfghjkl#yxcvbnmasdfghjkloiuztrewqasdfghjkoi,
+
+CPAYLOAD are Blocks of ZPAYLOAD smaller then 1024*1024 Bytes which
+are encrypted. Before encryption they might be padded with the
+character `X'
+
+ZPAYLOAD are Netstrings of PAYLOAD smaller then 1024*1024 Bytes which are 
+compressed.
+
+PAYLOAD are blocks of several messages smaller then 1024*1024 Bytes
+consisting of two netstrings: The first is the name of the message and
+the second is the Message itself. The name of a message must be a
+valid FFS filename.
+
+Example:
+
+15:123.456.host.de,23:the first mail message
+,16:567.890.host2.de,21:another mail message
+,
+
+Example of a complete data packet (using null encryption and compression):
+
++-- netstring containing a datablock of type P
+|   +-- netstring with compressed data of the messages
+|   |  +-- netstring with name of the first message 
+|   |  |                  +-- netstring with the first message 
+|   |  |                  |
+96:P91:15:123.456.host.de,23:the first mail message
+,15:567.890.host.de,21:another mail message
+,,X,
+
+A single Message can stretch through several payloads,
+reassembling should be handeled by the client.
+
+DELETIONREQUEST
+
+Deletionrequests are netstrings containing the name of a Message which 
+should be deleted by the server.
+
+The server waits vor deletion requests until the client closes the
+connection or until a timeout is reached.
+
+
